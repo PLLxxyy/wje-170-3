@@ -14,6 +14,8 @@ import AdminOverview from './pages/AdminOverview'
 import AdminDepartments from './pages/AdminDepartments'
 import AdminEfficiency from './pages/AdminEfficiency'
 import AdminExport from './pages/AdminExport'
+import DelegationManage from './pages/DelegationManage'
+import DelegationList from './pages/DelegationList'
 
 export default function App() {
   return (
@@ -28,6 +30,8 @@ export default function App() {
         <Route path="leave/apply" element={<ProtectedRoute roles={['employee', 'supervisor', 'hr']}><LeaveApply /></ProtectedRoute>} />
         <Route path="approval/pending" element={<ProtectedRoute roles={['supervisor', 'hr']}><ApprovalPending /></ProtectedRoute>} />
         <Route path="approval/history" element={<ProtectedRoute roles={['supervisor', 'hr']}><ApprovalHistory /></ProtectedRoute>} />
+        <Route path="delegation/manage" element={<ProtectedRoute roles={['supervisor']}><DelegationManage /></ProtectedRoute>} />
+        <Route path="delegation/list" element={<ProtectedRoute roles={['hr']}><DelegationList /></ProtectedRoute>} />
         <Route path="team/stats" element={<ProtectedRoute roles={['supervisor', 'hr']}><TeamStats /></ProtectedRoute>} />
         <Route path="admin/overview" element={<ProtectedRoute roles={['hr']}><AdminOverview /></ProtectedRoute>} />
         <Route path="admin/departments" element={<ProtectedRoute roles={['hr']}><AdminDepartments /></ProtectedRoute>} />

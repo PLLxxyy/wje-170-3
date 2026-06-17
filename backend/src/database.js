@@ -81,6 +81,19 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS approval_delegations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    delegator_id INTEGER NOT NULL,
+    delegate_id INTEGER NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'cancelled')),
+    reason TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY (delegator_id) REFERENCES users(id),
+    FOREIGN KEY (delegate_id) REFERENCES users(id)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_overtime_user ON overtime_applications(user_id);
   CREATE INDEX IF NOT EXISTS idx_overtime_status ON overtime_applications(status);
   CREATE INDEX IF NOT EXISTS idx_overtime_date ON overtime_applications(date);
@@ -89,6 +102,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_approval_application ON approval_records(application_id, application_type);
   CREATE INDEX IF NOT EXISTS idx_users_department ON users(department_id);
   CREATE INDEX IF NOT EXISTS idx_users_supervisor ON users(supervisor_id);
+  CREATE INDEX IF NOT EXISTS idx_delegation_delegator ON approval_delegations(delegator_id);
+  CREATE INDEX IF NOT EXISTS idx_delegation_delegate ON approval_delegations(delegate_id);
+  CREATE INDEX IF NOT EXISTS idx_delegation_status ON approval_delegations(status);
 `);
 
 export default db;

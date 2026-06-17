@@ -4,6 +4,16 @@ import { auth, roleCheck } from '../middleware/auth.js';
 
 const router = Router();
 
+function getActiveDelegatorIds(userId) {
+  const delegations = db.prepare(
+    `SELECT delegator_id FROM approval_delegations
+     WHERE delegate_id = ? AND status = 'active'
+       AND start_date <= date('now')
+       AND end_date >= date('now')`
+  ).all(userId);
+  return delegations.map(d => d.delegator_id);
+}
+
 router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   const { page = 1, pageSize = 10, application_type } = req.query;
   const offset = (page - 1) * pageSize;
@@ -14,10 +24,14 @@ router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   const leaveParams = [];
 
   if (req.user.role === 'supervisor') {
-    overtimeWhere = "WHERE o.status = 'pending_supervisor' AND u.supervisor_id = ?";
-    leaveWhere = "WHERE la.status = 'pending_supervisor' AND u.supervisor_id = ?";
-    overtimeParams.push(req.user.id);
-    leaveParams.push(req.user.id);
+    const delegatorIds = getActiveDelegatorIds(req.user.id);
+    const allSupervisorIds = [req.user.id, ...delegatorIds];
+    const placeholders = allSupervisorIds.map(() => '?').join(',');
+
+    overtimeWhere = `WHERE o.status = 'pending_supervisor' AND u.supervisor_id IN (${placeholders})`;
+    leaveWhere = `WHERE la.status = 'pending_supervisor' AND u.supervisor_id IN (${placeholders})`;
+    overtimeParams.push(...allSupervisorIds);
+    leaveParams.push(...allSupervisorIds);
   } else if (req.user.role === 'hr') {
     overtimeWhere = "WHERE o.status = 'pending_hr'";
     leaveWhere = "WHERE la.status = 'pending_hr'";
@@ -32,7 +46,8 @@ router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
     ).get(...overtimeParams).count;
     const otList = db.prepare(
       `SELECT o.id, 'overtime' as application_type, o.date, o.start_time, o.end_time, o.duration,
-              o.reason, o.status, o.created_at, u.name as applicant_name, d.name as department_name
+              o.reason, o.status, o.created_at, u.name as applicant_name, d.name as department_name,
+              u.supervisor_id
        FROM overtime_applications o
        JOIN users u ON o.user_id = u.id
        LEFT JOIN departments d ON u.department_id = d.id
@@ -50,7 +65,8 @@ router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
     const lvList = db.prepare(
       `SELECT la.id, 'leave' as application_type, la.start_date as date, la.start_date, la.end_date,
               la.hours as duration, la.reason, la.status, la.created_at,
-              u.name as applicant_name, d.name as department_name
+              u.name as applicant_name, d.name as department_name,
+              u.supervisor_id
        FROM leave_applications la
        JOIN users u ON la.user_id = u.id
        LEFT JOIN departments d ON u.department_id = d.id
@@ -62,6 +78,21 @@ router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   }
 
   list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (req.user.role === 'supervisor') {
+    const delegatorIds = getActiveDelegatorIds(req.user.id);
+    const delegatorMap = {};
+    delegatorIds.forEach(id => {
+      const user = db.prepare('SELECT name FROM users WHERE id = ?').get(id);
+      delegatorMap[id] = user?.name || '';
+    });
+    list = list.map(item => ({
+      ...item,
+      is_delegated: item.supervisor_id !== req.user.id,
+      delegator_name: item.supervisor_id !== req.user.id ? delegatorMap[item.supervisor_id] || '' : '',
+    }));
+  }
+
   const pagedList = list.slice(offset, offset + Number(pageSize));
 
   res.json({
@@ -81,6 +112,17 @@ function getApplicationAndType(id) {
   return null;
 }
 
+function canApproveAsSupervisor(userId, applicantSupervisorId) {
+  if (applicantSupervisorId === userId) return true;
+  const delegation = db.prepare(
+    `SELECT id FROM approval_delegations
+     WHERE delegator_id = ? AND delegate_id = ? AND status = 'active'
+       AND start_date <= date('now')
+       AND end_date >= date('now')`
+  ).get(applicantSupervisorId, userId);
+  return !!delegation;
+}
+
 router.post('/:id/approve', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   const id = req.params.id;
   const result = getApplicationAndType(id);
@@ -96,7 +138,7 @@ router.post('/:id/approve', auth, roleCheck('supervisor', 'hr'), (req, res) => {
       return res.status(400).json({ error: '当前状态不允许主管审批' });
     }
     const applicant = db.prepare('SELECT supervisor_id FROM users WHERE id = ?').get(app.user_id);
-    if (applicant.supervisor_id !== req.user.id) {
+    if (!canApproveAsSupervisor(req.user.id, applicant.supervisor_id)) {
       return res.status(403).json({ error: '无权审批此申请' });
     }
   } else if (req.user.role === 'hr') {
@@ -156,7 +198,7 @@ router.post('/:id/reject', auth, roleCheck('supervisor', 'hr'), (req, res) => {
       return res.status(400).json({ error: '当前状态不允许主管审批' });
     }
     const applicant = db.prepare('SELECT supervisor_id FROM users WHERE id = ?').get(app.user_id);
-    if (applicant.supervisor_id !== req.user.id) {
+    if (!canApproveAsSupervisor(req.user.id, applicant.supervisor_id)) {
       return res.status(403).json({ error: '无权审批此申请' });
     }
   } else if (req.user.role === 'hr') {

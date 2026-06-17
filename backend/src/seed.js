@@ -82,6 +82,13 @@ const seed = db.transaction(() => {
 
   insertLeave.run(zhangsanId, '2026-06-10', '2026-06-10', 4, '调休', 'approved');
   insertLeave.run(wangwuId, '2026-06-12', '2026-06-12', 3, '调休', 'pending_supervisor');
+
+  const insertDelegation = db.prepare(
+    `INSERT INTO approval_delegations (delegator_id, delegate_id, start_date, end_date, status, reason)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  );
+
+  insertDelegation.run(lisiId, zhaoliuId, '2026-06-15', '2026-06-25', 'active', '出差北京');
 });
 
 seed();

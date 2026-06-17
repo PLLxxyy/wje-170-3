@@ -193,6 +193,11 @@ export default function ApprovalPending() {
                       <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusBadge.cls}`}>
                         {statusBadge.label}
                       </span>
+                      {item.is_delegated && (
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                          代{item.delegator_name}审批
+                        </span>
+                      )}
                     </div>
 
                     <div className="text-sm text-slate-600 space-y-1">

@@ -9,6 +9,7 @@ import approvalRoutes from './routes/approval.js';
 import leaveRoutes from './routes/leave.js';
 import statsRoutes from './routes/stats.js';
 import adminRoutes from './routes/admin.js';
+import delegationRoutes from './routes/delegation.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -25,6 +26,7 @@ app.use('/api/approval', approvalRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/delegation', delegationRoutes);
 
 const frontendDist = join(__dirname, '..', '..', 'frontend', 'dist');
 app.use(express.static(frontendDist));

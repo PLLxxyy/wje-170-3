@@ -14,7 +14,9 @@ import {
   BarChart3,
   Download,
   LogOut,
-  PenLine
+  PenLine,
+  UserCheck,
+  ShieldCheck
 } from 'lucide-react'
 import useAuthStore from '../store/auth'
 
@@ -41,6 +43,7 @@ const navConfig = {
     { label: '调休申请', path: '/leave/apply', icon: CalendarOff },
     { label: '待审批', path: '/approval/pending', icon: CheckSquare },
     { label: '审批记录', path: '/approval/history', icon: History },
+    { label: '审批委托', path: '/delegation/manage', icon: UserCheck },
     { label: '团队统计', path: '/team/stats', icon: Users }
   ],
   hr: [
@@ -52,6 +55,7 @@ const navConfig = {
     { label: '待审批', path: '/approval/pending', icon: CheckSquare },
     { label: '审批记录', path: '/approval/history', icon: History },
     { label: '团队统计', path: '/team/stats', icon: Users },
+    { label: '审批委托', path: '/delegation/list', icon: ShieldCheck },
     { label: '人事概览', path: '/admin/overview', icon: Shield },
     { label: '部门排行', path: '/admin/departments', icon: Building },
     { label: '审批效率', path: '/admin/efficiency', icon: BarChart3 },
