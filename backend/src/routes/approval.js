@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import db from '../database.js';
-import { auth, roleCheck } from '../middleware/auth.js';
+import { auth, roleCheckWithDelegation, hasActiveDelegation } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -14,7 +14,11 @@ function getActiveDelegatorIds(userId) {
   return delegations.map(d => d.delegator_id);
 }
 
-router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
+function isActingAsSupervisor(user) {
+  return user.role === 'supervisor' || hasActiveDelegation(user.id);
+}
+
+router.get('/pending', auth, roleCheckWithDelegation('supervisor', 'hr'), (req, res) => {
   const { page = 1, pageSize = 10, application_type } = req.query;
   const offset = (page - 1) * pageSize;
 
@@ -23,9 +27,10 @@ router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   const overtimeParams = [];
   const leaveParams = [];
 
-  if (req.user.role === 'supervisor') {
+  if (isActingAsSupervisor(req.user)) {
     const delegatorIds = getActiveDelegatorIds(req.user.id);
-    const allSupervisorIds = [req.user.id, ...delegatorIds];
+    const baseSupervisorIds = req.user.role === 'supervisor' ? [req.user.id] : [];
+    const allSupervisorIds = [...baseSupervisorIds, ...delegatorIds];
     const placeholders = allSupervisorIds.map(() => '?').join(',');
 
     overtimeWhere = `WHERE o.status = 'pending_supervisor' AND u.supervisor_id IN (${placeholders})`;
@@ -79,7 +84,7 @@ router.get('/pending', auth, roleCheck('supervisor', 'hr'), (req, res) => {
 
   list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-  if (req.user.role === 'supervisor') {
+  if (isActingAsSupervisor(req.user)) {
     const delegatorIds = getActiveDelegatorIds(req.user.id);
     const delegatorMap = {};
     delegatorIds.forEach(id => {
@@ -123,7 +128,7 @@ function canApproveAsSupervisor(userId, applicantSupervisorId) {
   return !!delegation;
 }
 
-router.post('/:id/approve', auth, roleCheck('supervisor', 'hr'), (req, res) => {
+router.post('/:id/approve', auth, roleCheckWithDelegation('supervisor', 'hr'), (req, res) => {
   const id = req.params.id;
   const result = getApplicationAndType(id);
   if (!result) {
@@ -133,7 +138,7 @@ router.post('/:id/approve', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   const { app, type } = result;
   const tableName = type === 'overtime' ? 'overtime_applications' : 'leave_applications';
 
-  if (req.user.role === 'supervisor') {
+  if (isActingAsSupervisor(req.user)) {
     if (app.status !== 'pending_supervisor') {
       return res.status(400).json({ error: '当前状态不允许主管审批' });
     }
@@ -147,8 +152,8 @@ router.post('/:id/approve', auth, roleCheck('supervisor', 'hr'), (req, res) => {
     }
   }
 
-  const newStatus = req.user.role === 'supervisor' ? 'pending_hr' : 'approved';
-  const level = req.user.role === 'supervisor' ? 'supervisor' : 'hr';
+  const newStatus = isActingAsSupervisor(req.user) ? 'pending_hr' : 'approved';
+  const level = isActingAsSupervisor(req.user) ? 'supervisor' : 'hr';
 
   const updateApp = db.prepare(
     `UPDATE ${tableName} SET status = ?, updated_at = datetime('now') WHERE id = ?`
@@ -178,7 +183,7 @@ router.post('/:id/approve', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   res.json({ message: '审批通过', newStatus });
 });
 
-router.post('/:id/reject', auth, roleCheck('supervisor', 'hr'), (req, res) => {
+router.post('/:id/reject', auth, roleCheckWithDelegation('supervisor', 'hr'), (req, res) => {
   const id = req.params.id;
   const { comment } = req.body;
   if (!comment) {
@@ -193,7 +198,7 @@ router.post('/:id/reject', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   const { app, type } = result;
   const tableName = type === 'overtime' ? 'overtime_applications' : 'leave_applications';
 
-  if (req.user.role === 'supervisor') {
+  if (isActingAsSupervisor(req.user)) {
     if (app.status !== 'pending_supervisor') {
       return res.status(400).json({ error: '当前状态不允许主管审批' });
     }
@@ -207,7 +212,7 @@ router.post('/:id/reject', auth, roleCheck('supervisor', 'hr'), (req, res) => {
     }
   }
 
-  const level = req.user.role === 'supervisor' ? 'supervisor' : 'hr';
+  const level = isActingAsSupervisor(req.user) ? 'supervisor' : 'hr';
 
   const transaction = db.transaction(() => {
     db.prepare(`UPDATE ${tableName} SET status = 'rejected', updated_at = datetime('now') WHERE id = ?`).run(id);
@@ -221,7 +226,7 @@ router.post('/:id/reject', auth, roleCheck('supervisor', 'hr'), (req, res) => {
   res.json({ message: '已驳回' });
 });
 
-router.get('/history', auth, (req, res) => {
+router.get('/history', auth, roleCheckWithDelegation('supervisor', 'hr', 'employee'), (req, res) => {
   const records = db.prepare(
     `SELECT ar.*, u.name as approver_name
      FROM approval_records ar

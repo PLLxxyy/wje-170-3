@@ -123,13 +123,30 @@ export default function DelegationManage() {
                   required
                 >
                   <option value="">请选择被委托人</option>
-                  {potentialDelegates.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}（{u.department_name || '未知部门'} - {u.role === 'supervisor' ? '主管' : '员工'}）
-                    </option>
-                  ))}
+                  {potentialDelegates.map((u) => {
+                    const roleLabel = u.role === 'supervisor' ? '主管' : u.role === 'hr' ? '人事' : '员工'
+                    return (
+                      <option key={u.id} value={u.id}>
+                        {u.name}（{u.department_name || '未知部门'} - {roleLabel}）
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
+              {(() => {
+                const selected = potentialDelegates.find((u) => String(u.id) === String(form.delegate_id))
+                if (selected?.role === 'employee') {
+                  return (
+                    <div className="md:col-span-2 flex items-start gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <span className="text-amber-600 text-xs font-medium">⚠️</span>
+                      <p className="text-xs text-amber-700">
+                        该被委托人为普通员工，系统将在委托期内自动授予其审批权限。委托到期后权限自动回收。
+                      </p>
+                    </div>
+                  )
+                }
+                return null
+              })()}
               <div />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">

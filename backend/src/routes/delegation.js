@@ -112,8 +112,13 @@ router.get('/potential-delegates', auth, roleCheck('supervisor'), (req, res) => 
     `SELECT u.id, u.name, u.role, d.name as department_name
      FROM users u
      LEFT JOIN departments d ON u.department_id = d.id
-     WHERE u.id != ? AND u.role IN ('supervisor', 'employee')
-     ORDER BY u.name`
+     WHERE u.id != ? AND u.role IN ('supervisor', 'employee', 'hr')
+     ORDER BY CASE u.role
+       WHEN 'supervisor' THEN 0
+       WHEN 'hr' THEN 1
+       WHEN 'employee' THEN 2
+       ELSE 3
+     END, u.name`
   ).all(req.user.id);
 
   res.json(users);

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../database.js';
-import { auth, JWT_SECRET } from '../middleware/auth.js';
+import { auth, JWT_SECRET, hasActiveDelegation } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -55,6 +55,8 @@ router.get('/me', auth, (req, res) => {
     return res.status(404).json({ error: '用户不存在' });
   }
 
+  const canApprove = user.role === 'supervisor' || user.role === 'hr' || hasActiveDelegation(user.id);
+
   res.json({
     id: user.id,
     username: user.username,
@@ -63,6 +65,7 @@ router.get('/me', auth, (req, res) => {
     departmentId: user.department_id,
     departmentName: user.department_name,
     supervisorId: user.supervisor_id,
+    canApprove,
   });
 });
 

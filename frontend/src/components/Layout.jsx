@@ -76,7 +76,18 @@ export default function Layout() {
   }
 
   const role = user?.role || 'employee'
-  const navItems = navConfig[role] || navConfig.employee
+  let navItems = navConfig[role] || navConfig.employee
+
+  if (user?.canApprove && role === 'employee') {
+    const extraItems = [
+      { label: '待审批', path: '/approval/pending', icon: CheckSquare },
+      { label: '审批记录', path: '/approval/history', icon: History },
+    ]
+    const existingPaths = new Set(navItems.map(i => i.path))
+    extraItems.forEach(item => {
+      if (!existingPaths.has(item.path)) navItems.push(item)
+    })
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
